@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Przypominacz interwałów — PWA</title>
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0f172a" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="icon" sizes="192x192" href="./icons/icon-192.png" />
+<link rel="apple-touch-icon" href="./icons/icon-192.png" />
+<style>
+  :root{
+    --bg: #0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af;
+    --brand:#60a5fa; --accent:#34d399; --danger:#fb7185; --ring:#1f2937;
+    --shadow: 0 20px 50px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{
+    margin:0; font-family:Inter,system-ui,Arial,ui-sans-serif;
+    background: radial-gradient(1200px 800px at 20% -10%, #1e293b 0%, #0b1223 40%, #04070f 100%);
+    color:var(--text); display:grid; place-items:center; padding:24px;
+  }
+  .app{ width:min(840px,96vw); background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
+    border:1px solid rgba(255,255,255,.06); box-shadow:var(--shadow);
+    border-radius:20px; padding:22px; backdrop-filter: blur(8px); }
+  header{display:flex; align-items:center; gap:16px; justify-content:space-between; margin-bottom:14px}
+  .title{display:flex; gap:12px; align-items:center}
+  .logo{width:38px; height:38px; border-radius:10px;
+    background: conic-gradient(from 180deg at 50% 50%, #60a5fa, #34d399, #a78bfa, #60a5fa);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset; }
+  h1{font-size:20px; margin:0} .muted{color:var(--muted); font-size:13px}
+  .grid{display:grid; gap:16px; grid-template-columns:1.2fr 1fr}
+  @media (max-width: 760px){ .grid{grid-template-columns:1fr} }
+  .card{ background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.06);
+    border-radius:16px; padding:16px; }
+  .row{display:flex; flex-wrap:wrap; gap:12px} label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+  .field{flex:1 1 160px; min-width:160px}
+  input[type="number"], select{
+    width:100%; padding:12px 12px; font-size:15px; color:var(--text);
+    background:#0b1223; border:1px solid #1e293b; border-radius:12px; outline:none;
+  }
+  input[type="number"]:focus, select:focus{border-color:#334155; box-shadow:0 0 0 4px rgba(96,165,250,.15)}
+  .switch{display:inline-flex; align-items:center; gap:10px; user-select:none; cursor:pointer}
+  .toggle{ width:44px; height:26px; background:#0b1223; border:1px solid #1f2937;
+    border-radius:999px; position:relative; transition:.2s ease; }
+  .toggle::after{ content:""; width:20px; height:20px; border-radius:50%;
+    background:#e5e7eb; position:absolute; top:2px; left:2px; transition:.2s ease; }
+  .toggle.on{background:#0b3; border-color:#0b3a} .toggle.on::after{left:22px; background:white}
+  .btns{display:flex; gap:10px; flex-wrap:wrap}
+  button{ appearance:none; border:1px solid #1f2937; background:#0b1223; color:var(--text);
+    padding:11px 14px; border-radius:12px; font-weight:600; cursor:pointer; }
+  .primary{background:linear-gradient(180deg,#2563eb,#1d4ed8); border-color:transparent}
+  .secondary{background:#0b1223} .danger{background:linear-gradient(180deg,#ef4444,#dc2626); border-color:transparent}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  .timer{display:grid; place-items:center; padding:16px}
+  .ring{ --size:240px; width:var(--size); height:var(--size); border-radius:50%; display:grid; place-items:center;
+    background: radial-gradient(closest-side,#0b1223 82%, transparent 83% 100%),
+               conic-gradient(var(--brand) var(--pct,0%), rgba(255,255,255,.08) 0);
+    box-shadow: inset 0 0 30px rgba(0,0,0,.45), 0 10px 30px rgba(0,0,0,.35); }
+  .ring > .inner{text-align:center}
+  .time{font-size:36px; letter-spacing:1px} .sub{font-size:12px; color:var(--muted); margin-top:4px}
+  .stats{display:flex; gap:12px; flex-wrap:wrap; margin-top:10px}
+  .chip{ padding:8px 10px; border-radius:999px; font-size:12px; color:#d1d5db;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); }
+  footer{display:flex; justify-content:space-between; align-items:center; margin-top:8px}
+  .link{font-size:12px; color:var(--muted)}
+  .install{margin-left: auto; font-size:12px; opacity:.9}
+</style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div class="title">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Przypominacz interwałów</h1>
+          <div class="muted">Ustal, co ile minut ma zabrzmieć sygnał. Start ▶, Pauza ⏸, Reset ⟲</div>
+        </div>
+      </div>
+      <div class="muted" id="status">Gotowy</div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="row">
+          <div class="field">
+            <label for="minutes">Interwał (minuty)</label>
+            <input id="minutes" type="number" min="1" step="1" value="25" />
+          </div>
+          <div class="field">
+            <label for="repeats">Liczba powtórzeń (gdy pętla wył.)</label>
+            <input id="repeats" type="number" min="1" step="1" value="4" />
+          </div>
+          <div class="field">
+            <label for="sound">Dźwięk</label>
+            <select id="sound">
+              <option value="chime">Chime</option>
+              <option value="bell">Bell</option>
+              <option value="ping">Soft ping</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="volume">Głośność: <span id="volLabel">70%</span></label>
+            <input id="volume" type="range" min="0" max="100" value="70"
+                   oninput="volLabel.textContent=this.value+'%'" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px; align-items:center">
+          <label class="switch">
+            <div id="loopToggle" class="toggle on" role="switch" aria-checked="true" tabindex="0"></div>
+            <span>Pętla nieskończona</span>
+          </label>
+
+          <label class="switch" title="Włącz powiadomienia pulpitu (pozwolenie przeglądarki)">
+            <div id="notifyToggle" class="toggle" role="switch" aria-checked="false" tabindex="0"></div>
+            <span>Powiadomienia</span>
+          </label>
+
+          <div class="btns" style="margin-left:auto">
+            <button id="test" class="secondary" type="button">Test dźwięku 🔊</button>
+            <button id="start" class="primary" type="button">Start ▶</button>
+            <button id="pause" class="secondary" type="button" disabled>Pauza ⏸</button>
+            <button id="reset" class="danger" type="button" disabled>Reset ⟲</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card timer">
+        <div class="ring" id="ring" style="--pct:0%">
+          <div class="inner">
+            <div class="time" id="time">00:00</div>
+            <div class="sub" id="sub">Następny alarm za —</div>
+          </div>
+        </div>
+        <div class="stats">
+          <div class="chip">Interwał: <span id="chipInt">25 min</span></div>
+          <div class="chip">Pozostało powtórzeń: <span id="chipLeft">∞</span></div>
+          <div class="chip">Wykonane: <span id="chipDone">0</span></div>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <div class="link">Wskazówka: alarm działa także w tle.</div>
+      <div class="install" id="installBox" hidden>
+        <button id="installBtn" class="secondary">Zainstaluj aplikację</button>
+      </div>
+    </footer>
+  </div>
+
+<script>
+// --- Service Worker registration ---
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js");
+  });
+}
+
+// --- PWA install prompt (A2HS) ---
+let deferredPrompt;
+const installBox = document.getElementById("installBox");
+const installBtn = document.getElementById("installBtn");
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBox.hidden = false;
+});
+installBtn?.addEventListener("click", async () => {
+  installBox.hidden = true;
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  }
+});
+
+(function(){
+  const el = id => document.getElementById(id);
+  const minutesEl = el('minutes');
+  const repeatsEl = el('repeats');
+  const soundEl = el('sound');
+  const volumeEl = el('volume');
+  const loopToggle = el('loopToggle');
+  const notifyToggle = el('notifyToggle');
+  const startBtn = el('start');
+  const pauseBtn = el('pause');
+  const resetBtn = el('reset');
+  const testBtn = el('test');
+  const timeEl = el('time');
+  const subEl = el('sub');
+  const ringEl = el('ring');
+  const statusEl = document.getElementById('status');
+  const chipInt = el('chipInt');
+  const chipLeft = el('chipLeft');
+  const chipDone = el('chipDone');
+
+  let loop = true;
+  let notifications = false;
+  let intervalMs = 25 * 60 * 1000;
+  let targetTs = 0;
+  let timer = null;
+  let running = false;
+  let paused = false;
+  let remainingMs = 0;
+  let repeats = 4;
+  let repeatsLeft = Infinity;
+  let done = 0;
+
+  const storageKey = 'interval-reminder-pwa-v1';
+  function load(){
+    try{
+      const s = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      if(s.minutes) minutesEl.value = s.minutes;
+      if(s.repeats) repeatsEl.value = s.repeats;
+      if(typeof s.loop === 'boolean'){ setToggle(loopToggle, s.loop); loop = s.loop; }
+      if(typeof s.notifications === 'boolean'){ setToggle(notifyToggle, s.notifications); notifications = s.notifications; }
+      if(s.sound) soundEl.value = s.sound;
+      if(s.volume){ volumeEl.value = s.volume; volLabel.textContent = s.volume + '%'; }
+    }catch{}
+    reflectChips();
+  }
+  function save(){
+    const data = {
+      minutes: +minutesEl.value,
+      repeats: +repeatsEl.value,
+      loop,
+      notifications,
+      sound: soundEl.value,
+      volume: +volumeEl.value
+    };
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  }
+
+  function setToggle(node, on){
+    node.classList.toggle('on', !!on);
+    node.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  function bindToggle(node, onChange){
+    node.addEventListener('click', ()=> onChange(!node.classList.contains('on')));
+    node.addEventListener('keydown', (e)=>{
+      if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); onChange(!node.classList.contains('on')); }
+    });
+  }
+  bindToggle(loopToggle, (on)=>{ loop = on; setToggle(loopToggle, loop); reflectChips(); save(); });
+  bindToggle(notifyToggle, async (on)=>{
+    if(on){
+      try{
+        const perm = await Notification.requestPermission();
+        notifications = (perm === 'granted');
+        setToggle(notifyToggle, notifications);
+      }catch{
+        notifications = false;
+        setToggle(notifyToggle, false);
+      }
+    }else{
+      notifications = false;
+      setToggle(notifyToggle, false);
+    }
+    save();
+  });
+
+  // Audio
+  let audioCtx;
+  function ensureAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+  function playTone(type='chime', volume=0.7){
+    ensureAudio();
+    const now = audioCtx.currentTime;
+    const master = audioCtx.createGain(); master.gain.value = volume; master.connect(audioCtx.destination);
+    const env = (osc, t0, f1, f2, dur)=>{ osc.frequency.setValueAtTime(f1, t0); osc.frequency.exponentialRampToValueAtTime(f2, t0+dur); };
+
+    if(type==='chime'){
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type='sine'; o.frequency.value=880; g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(1, now+0.01); g.gain.exponentialRampToValueAtTime(0.001, now+0.6);
+      o.connect(g).connect(master); o.start(now); o.stop(now+0.65);
+      const o2=audioCtx.createOscillator(), g2=audioCtx.createGain();
+      o2.type='sine'; o2.frequency.value=1320; g2.gain.setValueAtTime(0, now);
+      g2.gain.linearRampToValueAtTime(0.5, now+0.02); g2.gain.exponentialRampToValueAtTime(0.001, now+0.5);
+      o2.connect(g2).connect(master); o2.start(now+0.02); o2.stop(now+0.55);
+    } else if(type==='bell'){
+      [660,990,1320].forEach((f,i)=>{
+        const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+        o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.8/(i+1), now+0.01); g.gain.exponentialRampToValueAtTime(0.001, now+0.8);
+        o.connect(g).connect(master); o.start(now+i*0.005); o.stop(now+0.85);
+      });
+    } else {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type='triangle'; env(o, now, 1200, 700, 0.25);
+      g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(0.9, now+0.01); g.gain.exponentialRampToValueAtTime(0.001, now+0.35);
+      o.connect(g).connect(master); o.start(now); o.stop(now+0.4);
+    }
+  }
+
+  function msFromMinutes(m){ return Math.max(1, Math.round(m)) * 60 * 1000; }
+  function fmt(ms){ ms = Math.max(0, ms|0); const s = Math.floor(ms/1000);
+    const mm = Math.floor(s/60), ss = s % 60; return `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`; }
+  function reflectChips(){
+    chipInt.textContent = `${+minutesEl.value} min`;
+    chipLeft.textContent = loop ? '∞' : (isFinite(repeatsLeft)? repeatsLeft : +repeatsEl.value);
+    chipDone.textContent = String(done);
+  }
+  function setStatus(txt){ statusEl.textContent = txt; }
+  function scheduleNext(durationMs){ const now = performance.now(); targetTs = now + durationMs; }
+
+  function tick(){
+    const now = performance.now();
+    const left = Math.max(0, targetTs - now);
+    const pct = 100 - (left / intervalMs) * 100;
+    ringEl.style.setProperty('--pct', pct + '%');
+    timeEl.textContent = fmt(left);
+    subEl.textContent = left>0 ? `Następny alarm za ${fmt(left)}` : 'Czas!';
+
+    if(left <= 0){
+      playTone(soundEl.value, (+volumeEl.value||0)/100);
+      if(notifications){
+        try{ new Notification('Przypominacz', { body: 'Interwał minął — przerwa / kolejny blok!', silent:false }); }catch{}
+      }
+      done++;
+      if(!loop){
+        repeatsLeft = Math.max(0, repeatsLeft-1);
+        if(repeatsLeft === 0){
+          stopTimer();
+          setStatus('Zakończono wszystkie powtórzenia');
+          reflectChips(); return;
+        }
+      }
+      scheduleNext(intervalMs);
+    }
+    reflectChips();
+  }
+
+  function startTimer(){
+    if(running) return;
+    intervalMs = msFromMinutes(+minutesEl.value || 1);
+    repeats = Math.max(1, +repeatsEl.value || 1);
+    repeatsLeft = loop ? Infinity : repeats;
+    done = 0;
+
+    scheduleNext(intervalMs);
+    timer = setInterval(tick, 250);
+    running = true; paused = false;
+    startBtn.disabled = true; pauseBtn.disabled = false; resetBtn.disabled = false;
+    minutesEl.disabled = repeatsEl.disabled = soundEl.disabled = true;
+    setStatus('W trakcie…'); reflectChips(); save();
+  }
+  function pauseTimer(){
+    if(!running || paused) return;
+    paused = true; clearInterval(timer); timer = null;
+    remainingMs = Math.max(0, targetTs - performance.now()); setStatus('Wstrzymano');
+    pauseBtn.textContent = 'Wznów ▶';
+  }
+  function resumeTimer(){
+    if(!running || !paused) return;
+    paused = false; scheduleNext(remainingMs || intervalMs);
+    timer = setInterval(tick, 250); setStatus('W trakcie…'); pauseBtn.textContent = 'Pauza ⏸';
+  }
+  function stopTimer(){
+    clearInterval(timer); timer = null; running = paused = false;
+    startBtn.disabled = false; pauseBtn.disabled = true; resetBtn.disabled = true;
+    minutesEl.disabled = repeatsEl.disabled = soundEl.disabled = false;
+    ringEl.style.setProperty('--pct','0%');
+  }
+  function resetTimer(){
+    stopTimer(); timeEl.textContent = '00:00'; subEl.textContent = 'Następny alarm za —';
+    done = 0; repeatsLeft = loop ? Infinity : (+repeatsEl.value||1); reflectChips(); setStatus('Gotowy');
+  }
+
+  startBtn.addEventListener('click', startTimer);
+  pauseBtn.addEventListener('click', ()=> paused ? resumeTimer() : pauseTimer());
+  resetBtn.addEventListener('click', resetTimer);
+  testBtn.addEventListener('click', ()=> playTone(soundEl.value, (+volumeEl.value||0)/100));
+  [minutesEl, repeatsEl, soundEl, volumeEl].forEach(n => n.addEventListener('change', ()=>{ reflectChips(); save(); }));
+
+  load(); resetTimer();
+})();
+</script>
+</body>
+</html>
