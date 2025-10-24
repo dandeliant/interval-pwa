@@ -1,5 +1,5 @@
 // Simple PWA Service Worker (cache-first for app shell, network-first for others)
-const CACHE_NAME = 'interval-pwa-v1';
+const CACHE_NAME = 'interval-pwa-v2';
 const APP_SHELL = [
   './',
   './index.html',
